@@ -1,6 +1,9 @@
 class Intel8080 {
     constructor() {
         this.memory = new Uint8Array(65536);
+        this.devices = new Map();
+        this.clockedDevices = new Set();
+        this.ioListeners = new Set();
         this.reset();
     }
 
@@ -24,9 +27,70 @@ class Intel8080 {
             cy: false
         };
         this.halted = false;
+        this.lastInstructionAddress = 0;
         if (this.memory) {
             this.memory.fill(0);
         }
+        const resetTargets = new Set([...this.devices.values(), ...this.clockedDevices]);
+        resetTargets.forEach((device) => {
+            if (device && typeof device.reset === 'function') device.reset();
+            if (device && device.clockedDevice && typeof device.clockedDevice.reset === 'function') device.clockedDevice.reset();
+        });
+    }
+
+    /** Registra un dispositivo de E/S en un puerto de 8 bits. */
+    attachDevice(port, device) {
+        const normalizedPort = Number(port) & 0xFF;
+        this.devices.set(normalizedPort, device || {});
+        if (device && device.clockedDevice) this.clockedDevices.add(device.clockedDevice);
+        if (device && typeof device.tick === 'function') this.clockedDevices.add(device);
+        return this;
+    }
+
+    detachDevice(port) {
+        const normalizedPort = Number(port) & 0xFF;
+        const device = this.devices.get(normalizedPort);
+        this.devices.delete(normalizedPort);
+        if (device && device.clockedDevice && ![...this.devices.values()].some((item) => item.clockedDevice === device.clockedDevice)) {
+            this.clockedDevices.delete(device.clockedDevice);
+        }
+        return device;
+    }
+
+    onIO(listener) {
+        if (typeof listener === 'function') this.ioListeners.add(listener);
+        return () => this.ioListeners.delete(listener);
+    }
+
+    notifyIO(event) {
+        this.ioListeners.forEach((listener) => listener(event));
+    }
+
+    readPort(port, instructionAddress = this.lastInstructionAddress) {
+        const normalizedPort = Number(port) & 0xFF;
+        const device = this.devices.get(normalizedPort);
+        let value = 0xFF;
+        if (device && typeof device.read === 'function') {
+            try { value = Number(device.read()) & 0xFF; } catch (error) { value = 0xFF; }
+        }
+        this.notifyIO({ direction: 'IN', port: normalizedPort, value, address: instructionAddress & 0xFFFF });
+        return value;
+    }
+
+    writePort(port, value, instructionAddress = this.lastInstructionAddress) {
+        const normalizedPort = Number(port) & 0xFF;
+        const normalizedValue = Number(value) & 0xFF;
+        const device = this.devices.get(normalizedPort);
+        if (device && typeof device.write === 'function') {
+            try { device.write(normalizedValue); } catch (error) { /* Los dispositivos no deben detener al CPU. */ }
+        }
+        this.notifyIO({ direction: 'OUT', port: normalizedPort, value: normalizedValue, address: instructionAddress & 0xFFFF });
+    }
+
+    tickDevices() {
+        this.clockedDevices.forEach((device) => {
+            if (device && typeof device.tick === 'function') device.tick();
+        });
     }
 
     getRP(rp) {
@@ -133,11 +197,15 @@ class Intel8080 {
 
     step() {
         if (this.halted) return;
+        this.tickDevices();
+        const instructionAddress = this.registers.pc;
         const opcode = this.fetch();
-        this.execute(opcode);
+        this.lastInstructionAddress = instructionAddress;
+        this.execute(opcode, instructionAddress);
+        return { address: instructionAddress, opcode };
     }
 
-    execute(opcode) {
+    execute(opcode, instructionAddress = (this.registers.pc - 1) & 0xFFFF) {
         // MOV
         if (opcode >= 0x40 && opcode <= 0x7F && opcode !== 0x76) {
             this.setRegByCode((opcode >> 3) & 0x07, this.getRegByCode(opcode & 0x07));
@@ -265,9 +333,9 @@ class Intel8080 {
             case 0x37: this.flags.cy = true; break; // STC
             case 0x3F: this.flags.cy = !this.flags.cy; break; // CMC
 
-            // Special
-            case 0xDB: this.fetch(); break; // IN (Ignored for now)
-            case 0xD3: this.fetch(); break; // OUT (Ignored for now)
+            // E/S: IN lee el puerto hacia A y OUT escribe A en el puerto.
+            case 0xDB: { const port = this.fetch(); this.registers.a = this.readPort(port, instructionAddress); break; }
+            case 0xD3: { const port = this.fetch(); this.writePort(port, this.registers.a, instructionAddress); break; }
             case 0xFB: break; // EI
             case 0xF3: break; // DI
         }

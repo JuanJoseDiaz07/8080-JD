@@ -1,103 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Intel 8080 Emulator & Assembler</title>
+    <meta name="description" content="Emulador Intel 8080 con coprocesador de punto flotante IEEE-754 conectado por puertos.">
+    <title>8080 FPU Lab · Consola de arquitectura</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <header>
-        <div class="header-container">
-            <h1>Intel 8080 Emulator & Assembler</h1>
-            <span class="version-badge">Version 2.1</span>
-        </div>
+    <header class="topbar">
+        <div class="header-container"><div class="brand-prompt"><span class="prompt-mark">8080</span><h1>8080 FPU LAB</h1><span class="version-badge">v3.0.0</span></div><div class="classic-label">TEMA CLÁSICO</div></div>
     </header>
 
-    <main>
-        <section id="editor-section">
-            <h2>Assembler</h2>
-            <textarea id="code-editor" spellcheck="false" placeholder="Write your 8080 assembly here...
-Example:
-MVI A, 5
-MVI B, 10
-ADD B
-STA 2000H
-HLT"></textarea>
-            <div class="controls">
-                <button id="btn-assemble">Assemble & Load</button>
-                <button id="btn-clear-code" class="btn-clear">Clear Code</button>
-            </div>
-            <div id="assembler-output"></div>
-        </section>
+    <main class="app-shell">
+        <div class="workspace-grid">
+            <section id="editor-section" class="panel editor-panel" aria-labelledby="assembler-title">
+                <div class="panel-title"><h2 id="assembler-title">[ ENSAMBLADOR 8080 ]</h2><span class="panel-state">LISTO</span></div>
+                <div class="program-toolbar"><label for="program-select">Programa de ejemplo<select id="program-select"></select></label><span class="terminal-hint">ORG / DB / ETIQUETAS / IN / OUT</span></div>
+                <div class="editor-wrap"><span class="editor-prompt" aria-hidden="true">&gt;</span><textarea id="code-editor" spellcheck="false" aria-label="Editor de código ensamblador" placeholder="Escribe tu programa 8080..."></textarea></div>
+                <div class="controls primary-controls"><button id="btn-assemble">Ensamblar y cargar</button><button id="btn-run">Ejecutar</button><button id="btn-stop" class="button-muted">Detener</button><button id="btn-step" class="button-muted">Paso</button><button id="btn-reset" class="button-muted">Reiniciar</button></div>
+                <div class="controls demo-controls"><button id="btn-demo" class="button-accent">▶ Demo guiada</button><button id="btn-demo-next" class="button-muted">Siguiente paso</button><label for="speed-select">Velocidad<select id="speed-select"><option value="1">Lenta</option><option value="4" selected>Normal</option><option value="12">Rápida</option></select></label></div>
+                <div id="assembler-output" class="console-message" aria-live="polite"></div><div id="demo-narration" class="narration" aria-live="polite">Carga un programa o inicia la demostración guiada.</div>
+            </section>
 
-        <section id="emulator-section">
-            <h2>CPU Dashboard</h2>
-            <div class="controls">
-                <button id="btn-run">Run</button>
-                <button id="btn-stop">Stop</button>
-                <button id="btn-step">Step</button>
-                <button id="btn-reset">Reset</button>
-                <span id="status-badge">Idle</span>
-            </div>
-
-            <div class="cpu-grid">
-                <div class="card registers">
-                    <h3>Registers</h3>
-                    <div class="reg-row">
-                        <div class="reg-box"><span>A</span><div id="reg-a">00</div></div>
-                        <div class="reg-box"><span>Flags</span><div id="reg-f">02</div></div>
-                    </div>
-                    <div class="reg-row">
-                        <div class="reg-box"><span>B</span><div id="reg-b">00</div></div>
-                        <div class="reg-box"><span>C</span><div id="reg-c">00</div></div>
-                    </div>
-                    <div class="reg-row">
-                        <div class="reg-box"><span>D</span><div id="reg-d">00</div></div>
-                        <div class="reg-box"><span>E</span><div id="reg-e">00</div></div>
-                    </div>
-                    <div class="reg-row">
-                        <div class="reg-box"><span>H</span><div id="reg-h">00</div></div>
-                        <div class="reg-box"><span>L</span><div id="reg-l">00</div></div>
-                    </div>
-                    <div class="reg-row">
-                        <div class="reg-box extended"><span>PC</span><div id="reg-pc">0000</div></div>
-                        <div class="reg-box extended"><span>SP</span><div id="reg-sp">FFFF</div></div>
-                    </div>
+            <section id="emulator-section" class="panel cpu-panel" aria-labelledby="cpu-title">
+                <div class="panel-title"><h2 id="cpu-title">[ CPU / REGISTROS ]</h2><span id="status-badge" class="panel-state">EN ESPERA</span></div>
+                <div class="register-grid">
+                    <div class="register-box"><span>A</span><strong id="reg-a">00</strong><div id="bits-a" class="led-bits" aria-label="Bits del registro A"></div></div><div class="register-box"><span>B</span><strong id="reg-b">00</strong><div id="bits-b" class="led-bits" aria-label="Bits del registro B"></div></div><div class="register-box"><span>C</span><strong id="reg-c">00</strong><div id="bits-c" class="led-bits" aria-label="Bits del registro C"></div></div><div class="register-box"><span>D</span><strong id="reg-d">00</strong><div id="bits-d" class="led-bits" aria-label="Bits del registro D"></div></div><div class="register-box"><span>E</span><strong id="reg-e">00</strong><div id="bits-e" class="led-bits" aria-label="Bits del registro E"></div></div><div class="register-box"><span>H</span><strong id="reg-h">00</strong><div id="bits-h" class="led-bits" aria-label="Bits del registro H"></div></div><div class="register-box"><span>L</span><strong id="reg-l">00</strong><div id="bits-l" class="led-bits" aria-label="Bits del registro L"></div></div><div class="register-box register-wide"><span>FLAGS</span><strong id="reg-f">02</strong></div><div class="register-box register-wide"><span>PC</span><strong id="reg-pc">0000</strong><div id="bits-pc" class="led-bits" aria-label="Bits del contador de programa"></div></div><div class="register-box register-wide"><span>SP</span><strong id="reg-sp">FFFF</strong><div id="bits-sp" class="led-bits" aria-label="Bits del puntero de pila"></div></div>
                 </div>
+                <div class="cpu-lower-grid"><div class="subpanel"><h3>[ BANDERAS CPU ]</h3><div class="flag-led-grid"><span class="led-label"><i data-led="cpu-s" role="checkbox" aria-label="Signo" aria-checked="false"></i>S</span><span class="led-label"><i data-led="cpu-z" role="checkbox" aria-label="Cero" aria-checked="false"></i>Z</span><span class="led-label"><i data-led="cpu-ac" role="checkbox" aria-label="Acarreo auxiliar" aria-checked="false"></i>AC</span><span class="led-label"><i data-led="cpu-p" role="checkbox" aria-label="Paridad" aria-checked="false"></i>P</span><span class="led-label"><i data-led="cpu-cy" role="checkbox" aria-label="Acarreo" aria-checked="false"></i>CY</span></div></div><div class="subpanel"><h3>[ PILA ]</h3><div id="stack-table" class="stack-table"></div></div></div>
+                <div class="subpanel memory-panel"><div class="subpanel-title"><h3>[ MEMORIA ]</h3><div><input id="mem-start-addr" value="0000" size="4" aria-label="Dirección inicial de memoria"><button id="btn-mem-go">Ir</button></div></div><div id="memory-table" class="memory-table"></div></div>
+            </section>
+        </div>
 
-                <div class="dashboard-right">
-                    <div class="card flags">
-                        <h3>Flags</h3>
-                        <div class="flags-row">
-                            <div class="flag-box" title="Sign Flag (Signo): Se activa (1) si el bit más significativo (bit 7) del resultado es 1, indicando un número negativo."><span>S</span><div id="flag-s">0</div></div>
-                            <div class="flag-box" title="Zero Flag (Cero): Se activa (1) si el resultado de la última operación fue exactamente cero."><span>Z</span><div id="flag-z">0</div></div>
-                            <div class="flag-box" title="Auxiliary Carry Flag (Acarreo Auxiliar): Se activa (1) si hay un acarreo del bit 3 al bit 4 en una suma, o si no hay préstamo en una resta. Es utilizado por DAA."><span>AC</span><div id="flag-ac">0</div></div>
-                            <div class="flag-box" title="Parity Flag (Paridad): Se activa (1) si el resultado tiene un número par de bits en 1."><span>P</span><div id="flag-p">0</div></div>
-                            <div class="flag-box" title="Carry Flag (Acarreo): Se activa (1) si la última operación generó un acarreo (en suma) o un préstamo (en resta) fuera del bit más significativo."><span>CY</span><div id="flag-cy">0</div></div>
-                        </div>
-                    </div>
-
-                    <div class="card stack">
-                        <h3>Stack View (around SP)</h3>
-                        <div id="stack-table"></div>
-                    </div>
-                </div>
-
-                <div class="card memory">
-                    <h3>Memory View</h3>
-                    <div class="mem-controls">
-                        <input type="text" id="mem-start-addr" value="0000" size="4">
-                        <button id="btn-mem-go">Go</button>
-                    </div>
-                    <div id="memory-table"></div>
-                </div>
+        <section id="fpu-section" aria-labelledby="fpu-title">
+            <div class="section-heading"><div><span class="eyebrow">DISPOSITIVO EN PUERTOS 20H / 21H</span><h2 id="fpu-title">[ COPROCESADOR FPU ]</h2></div><p>La FPU recibe bytes binary32 por <code>OUT 20H</code>, ejecuta comandos por <code>OUT 21H</code> y devuelve el resultado por <code>IN 20H</code>.</p></div>
+            <div class="fpu-grid">
+                <article class="panel fpu-stack-panel"><div class="panel-title"><h3>[ PILA FPU · X Y Z T ]</h3><span id="fpu-status-value" class="panel-state">LISTA · 02H</span></div><div id="fpu-stack" class="fpu-stack"></div><div class="fpu-status-leds"><span class="led-label"><i data-led="fpu-busy" role="checkbox" aria-label="BUSY" aria-checked="false"></i>BUSY</span><span class="led-label"><i data-led="fpu-ready" role="checkbox" aria-label="READY" aria-checked="false"></i>READY</span><span class="led-label"><i data-led="fpu-invalid" role="checkbox" aria-label="INVALID" aria-checked="false"></i>INVALID</span><span class="led-label"><i data-led="fpu-div0" role="checkbox" aria-label="DIV0" aria-checked="false"></i>DIV0</span><span class="led-label"><i data-led="fpu-overflow" role="checkbox" aria-label="OVERFLOW" aria-checked="false"></i>OVF</span><span class="led-label"><i data-led="fpu-underflow" role="checkbox" aria-label="UNDERFLOW" aria-checked="false"></i>UNF</span><span class="led-label"><i data-led="fpu-zero" role="checkbox" aria-label="ZERO" aria-checked="false"></i>ZERO</span><span class="led-label"><i data-led="fpu-negative" role="checkbox" aria-label="NEG" aria-checked="false"></i>NEG</span></div><div class="phase-readout"><span>FASE</span><strong id="fpu-phase">En espera</strong><code id="fpu-cycles">0 ciclos</code></div></article>
+                <article class="panel datapath-panel"><div class="panel-title"><h3>[ DATAPATH ]</h3><span class="panel-state">EN VIVO</span></div><div class="datapath"><div data-path="path-cpu" class="path-node">8080<small>CPU</small></div><i data-path="path-bus" class="path-line"></i><div data-path="path-fpu" class="path-node fpu-node">FPU<small>ALU / STACK</small></div><i data-path="path-ram" class="path-line"></i><div class="path-node">RAM<small>2000H–2003H</small></div></div><div class="operation-phase"><span>DESEMPAQUETAR</span><span>ALINEAR</span><span>OPERAR</span><span>NORMALIZAR</span><span>REDONDEAR</span></div><div class="datapath-note">La iluminación se activa con cada transferencia real de E/S.</div></article>
             </div>
+            <div class="fpu-lower-grid"><article class="panel bus-panel"><div class="panel-title"><h3>[ MONITOR DE BUS / E/S ]</h3><span>ÚLTIMOS EVENTOS</span></div><div id="io-log" class="io-log" aria-live="polite"></div></article><article class="panel manual-panel"><div class="panel-title"><h3>[ PRUEBA MANUAL POR PUERTOS ]</h3><span>USA LA MISMA FPU</span></div><div class="manual-form"><label>A<input id="manual-a" type="number" value="3.5" step="any"></label><label>Operación<select id="manual-operation"><option value="add">FADD</option><option value="subtract">FSUB</option><option value="multiply">FMUL</option><option value="divide">FDIV</option></select></label><label>B<input id="manual-b" type="number" value="2.25" step="any"></label><button id="manual-run">Enviar por 20H / 21H</button></div><div id="manual-result" class="manual-result">Resultado: —</div></article></div>
+            <article class="panel demo-panel"><div class="panel-title"><h3>[ DEMO GUIADA ]</h3><span>PREPARADA PARA VIDEO</span></div><p>La demo carga el programa de suma, ejecuta las instrucciones reales paso a paso y narra el intercambio CPU ↔ FPU. Usa <strong>Demo guiada</strong>, pausa con <strong>Detener</strong> y continúa con <strong>Siguiente paso</strong>.</p><div class="demo-command-line"><span>&gt;</span><code>OUT 20H · IN 21H · ANI 01H · JNZ ESPERA · IN 20H</code><span class="cursor"></span></div></article>
         </section>
     </main>
-
-    <script src="cpu.js"></script>
-    <script src="assembler.js"></script>
-    <script src="main.js"></script>
+    <footer class="footer">8080 FPU LAB · Fork educativo · Intel 8080 + FPU IEEE-754 · MIT</footer>
+    <script src="cpu.js"></script><script src="assembler.js"></script><script src="fpu.js"></script><script src="programs.js"></script><script src="main.js"></script>
 </body>
 </html>

@@ -1,74 +1,131 @@
-# Intel 8080 CPU Emulator & Assembler - Version 2.1.0
+# Intel 8080 + FPU Lab · Versión 3.0.0
 
-Bienvenidos al emulador y ensamblador de la arquitectura Intel 8080. Este proyecto ha sido construido desde cero utilizando tecnología 100% web pura (HTML5, CSS3 y Vanilla JavaScript) sin frameworks ni dependencias de ningún tipo, garantizando una carga instantánea y la máxima compatibilidad educativa.
+Fork educativo del emulador y ensamblador Intel 8080. Esta versión integra un coprocesador de punto flotante conceptual, conectado al CPU mediante los puertos de E/S del 8080 y modelado con IEEE-754 binary32.
 
----
+## Ejecutar
 
-## 🌟 ¿Por qué nació este proyecto? (Historia y Propósito)
+El proyecto no usa frameworks, dependencias ni build. Sirve los archivos estáticos desde la raíz:
 
-En la enseñanza de la informática y la ingeniería de sistemas, existe una brecha pedagógica crítica al transicionar de lenguajes de alto nivel (como Python, Java o JavaScript) al entendimiento del hardware real. Los simuladores tradicionales de bajo nivel suelen ser difíciles de instalar, tienen interfaces obsoletas o carecen de feedback visual inmediato.
+```powershell
+python -m http.server 8000
+```
 
-**Este simulador nació con el propósito de resolver este problema.** Su objetivo es democratizar la enseñanza de la arquitectura de computadoras proporcionando un entorno gráfico intuitivo, interactivo y moderno. Permite a los estudiantes "ver dentro" de una unidad central de procesamiento (CPU): observar cómo cambian los registros paso a paso, cómo fluyen los datos en la memoria RAM y cómo se comportan las banderas de estado (*flags*) en respuesta a operaciones aritméticas elementales.
+Si Python no está disponible en Windows, puede usarse cualquier servidor estático local o el servidor Node indicado en la documentación de la entrega. Abre `http://localhost:8000`.
 
----
+Las pruebas unitarias se ejecutan con:
 
-## 🛠️ ¿Para qué sirve?
+```powershell
+node test.js
+```
 
-*   **Enseñanza Didáctica y Práctica:** Ideal para profesores y estudiantes de ciencias de la computación que desean experimentar la programación en lenguaje ensamblador sin la fricción de instalar herramientas en sistemas operativos locales.
-*   **Visualización de Flujo de Datos:** El panel interactivo permite observar las dinámicas de:
-    *   Los registros de propósito general y específicos.
-    *   Las operaciones de pila (*Stack*) con seguimiento visual directo de la dirección apuntada por `SP`.
-    *   La memoria RAM desglosada en un mapa bidimensional interactivo con localización instantánea.
-*   **Depuración Paso a Paso (*Debugging*):** Permite ejecutar programas instrucción por instrucción, deteniendo y analizando el procesador para encontrar errores de lógica con facilidad.
+## Integración CPU ↔ FPU
 
----
+La FPU se conecta como dos dispositivos de puerto:
 
-## 🚀 Novedades de la Versión 2.1.0
+| Puerto | Dirección | Función |
+| --- | --- | --- |
+| `20H` | `OUT` | Empuja un byte al buffer del operando. Cada 4 bytes forman un binary32 little-endian. |
+| `20H` | `IN` | Extrae un byte del resultado binary32, también little-endian. |
+| `21H` | `OUT` | Ejecuta un comando FPU. |
+| `21H` | `IN` | Lee el registro de estado. |
 
-Esta versión representa un gran salto adelante en la calidad del entorno de desarrollo web:
-- **Visualizador de Pila (*Stack View*):** Un componente visual que muestra los valores de 16 bits y bytes individuales que se encuentran en las posiciones de memoria alrededor de la dirección del puntero de pila (`SP`).
-- **Banderas Explicadas (*Tooltips*):** Al colocar el puntero del ratón sobre cualquiera de las banderas de estado (`S`, `Z`, `AC`, `P`, `CY`), se muestra un tooltip detallado en español explicando su lógica.
-- **Botón Clear Code:** Permite vaciar el editor del ensamblador y sus salidas con un solo clic.
-- **Reset Profundo:** Al reiniciar el CPU, se limpia la memoria por completo (rellenando con ceros), se resetean todos los registros, banderas y el visor de memoria se restablece a la dirección inicial `0000`.
+Puertos sin dispositivo devuelven `FFH` en `IN` y descartan `OUT`. La API del CPU también permite conectar dispositivos propios:
 
----
+```javascript
+cpu.attachDevice(0x10, {
+    read: () => 0xA5,
+    write: (value) => console.log(value)
+});
+```
 
-## 📦 Características Principales
+## Comandos FPU
 
-*   **Núcleo de CPU Intel 8080 Completo:**
-    *   Emulación fiel del juego de instrucciones.
-    *   Gestión precisa de banderas (Sign, Zero, Auxiliary Carry, Parity, Carry).
-    *   Soporte completo de la instrucción decimal `DAA`.
-*   **Ensamblador Integrado:**
-    *   Soporta mnemónicos estándar, etiquetas (labels) y comentarios.
-    *   Directivas especiales como `ORG` (Origin) y `DB` (Define Byte).
-    *   Soporta alias de registros dobles (`BC`, `DE`, `HL`).
-*   **Cuadro de Mando Visual (Dashboard):**
-    *   Registros en tiempo real.
-    *   Estado del CPU (Ejecutando, En pausa, Halted).
-*   **Mapa de Memoria Dinámico:**
-    *   Visor de memoria con búsqueda hexadecimal y marcado de color para la posición actual del Program Counter (`PC`).
+| Código | Comando | Operación |
+| --- | --- | --- |
+| `01H` | `FADD` | `Y + X` |
+| `02H` | `FSUB` | `Y - X` |
+| `03H` | `FMUL` | `Y × X` |
+| `04H` | `FDIV` | `Y ÷ X` |
+| `05H` | `FSQRT` | `√X` |
+| `06H` | `FCHS` | Cambiar signo de `X` |
+| `07H` | `FABS` | Valor absoluto de `X` |
+| `08H` | `FCMP` | Comparar `Y` con `X` en el estado |
+| `09H` | `FLD` | Duplicar el tope de la pila |
+| `0AH` | `FXCH` | Intercambiar `X` e `Y` |
+| `0FH` | `FCLR` | Limpiar pila, buffers y estado |
 
----
+La pila tiene los registros conceptuales `X`, `Y`, `Z`, `T` y una profundidad mínima de cuatro valores. Los comandos tardan ocho pasos de CPU; durante ese tiempo `BUSY=1` y el programa debe sondear `IN 21H`.
 
-## 💻 Guía de Inicio Rápido
+### Registro de estado
 
-Para utilizar el emulador de forma local en tu máquina o para desarrollo:
+| Bit | Nombre | Significado |
+| ---: | --- | --- |
+| 0 | `BUSY` | La operación sigue en ejecución. |
+| 1 | `READY` | La FPU está lista. |
+| 2 | `INVALID` | NaN, raíz negativa, comando o pila inválida. |
+| 3 | `DIV0` | División entre cero. |
+| 4 | `OVERFLOW` | Desbordamiento a infinito. |
+| 5 | `UNDERFLOW` | Resultado no nulo reducido a cero. |
+| 6 | `ZERO` | Resultado igual a cero. |
+| 7 | `NEG` | Resultado negativo. |
 
-1. **Clonar o descargar** este repositorio.
-2. Servir el proyecto localmente mediante cualquier servidor web estático. Por ejemplo, si tienes Python instalado, ejecuta en la terminal de la raíz:
-   ```bash
-   python3 -m http.server 8000
-   ```
-3. Abre tu navegador e ingresa a `http://localhost:8000`.
-4. ¡Comienza a escribir código ensamblador, presiona **Assemble & Load**, y ejecuta tu programa con **Run** o **Step**!
+## Programa mínimo: 3.5 + 2.25
 
----
+Los bytes de `3.5` son `00 00 60 40`; los de `2.25` son `00 00 10 40`. El resultado `5.75` se guarda como `00 00 B8 40` en `2000H–2003H`:
 
-## 📝 Documentación Recomendada
+```asm
+MVI A, 00H
+OUT 20H
+OUT 20H
+MVI A, 60H
+OUT 20H
+MVI A, 40H
+OUT 20H
 
-*   **`INSTRUCTIONS.md`:** Nuestro libro didáctico interactivo diseñado específicamente para que los estudiantes de alto nivel aprendan el funcionamiento práctico del ensamblador paso a paso, con guías estructuradas de aritmética, ciclos, condicionales y la pila.
+MVI A, 00H
+OUT 20H
+OUT 20H
+MVI A, 10H
+OUT 20H
+MVI A, 40H
+OUT 20H
 
----
-**Versión del Proyecto:** 2.1.0
-**Licencia:** MIT
+MVI A, 01H
+OUT 21H
+ESPERA:
+IN 21H
+ANI 01H
+JNZ ESPERA
+
+IN 20H
+STA 2000H
+IN 20H
+STA 2001H
+IN 20H
+STA 2002H
+IN 20H
+STA 2003H
+HLT
+```
+
+La interfaz incluye además ejemplos de área de círculo, conversión Celsius/Fahrenheit, división por cero y raíz cuadrada de 2.
+
+## Interfaz y demostración
+
+La interfaz utiliza únicamente el tema `Retro clásico`, inspirado en el panel frontal del Altair 8800, con carcasa beige, tipografía monoespaciada y LEDs rojos. El editor de ensamblador usa un área gris de alto contraste para facilitar la lectura.
+
+La pantalla muestra registros y banderas del 8080 como LEDs binarios, la pila FPU con decimal/hexadecimal/bits, el registro de estado, el monitor de bus, el datapath iluminado durante cada `IN/OUT` y la fase real de la FPU durante `BUSY`.
+
+`Demo guiada` carga la suma de ejemplo y ejecuta el mismo programa instrucción por instrucción; no es una animación independiente. El guion para grabar el video está en [GUION_VIDEO.md](GUION_VIDEO.md).
+
+## Publicación
+
+El proyecto está listo para GitHub Pages porque `index.html` está en la raíz y todas las rutas son relativas. Marcador de URL:
+
+```text
+https://<usuario>.github.io/8080emilio/
+```
+
+## Licencia
+
+MIT. Este repositorio es un fork educativo del proyecto original y conserva su aviso de licencia.
